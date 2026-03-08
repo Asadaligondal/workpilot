@@ -1,0 +1,435 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Auth & Tenancy ───────────────────────────────────────────
+
+model User {
+  id        String   @id @default(cuid())
+  clerkId   String   @unique
+  email     String   @unique
+  name      String?
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships WorkspaceMember[]
+  auditLogs   AuditLog[]
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  industry  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members         WorkspaceMember[]
+  businessProfile BusinessProfile?
+  departments     Department[]
+  toolStackItems  ToolStackItem[]
+  workflows       Workflow[]
+  opportunities   Opportunity[]
+  roadmaps        Roadmap[]
+  budgetEstimates BudgetEstimate[]
+  reports         Report[]
+  proposals       Proposal[]
+  jobPosts        JobPost[]
+  scope           Scope?
+  documents       Document[]
+  notifications   Notification[]
+  auditLogs       AuditLog[]
+  subscription    Subscription?
+  modelRuns       ModelRun[]
+}
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+model WorkspaceMember {
+  id          String        @id @default(cuid())
+  userId      String
+  workspaceId String
+  role        WorkspaceRole @default(MEMBER)
+  createdAt   DateTime      @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workspaceId])
+}
+
+// ─── Business Profile ─────────────────────────────────────────
+
+model BusinessProfile {
+  id             String   @id @default(cuid())
+  workspaceId    String   @unique
+  companyName    String?
+  website        String?
+  industry       String?
+  subIndustry    String?
+  teamSize       String?
+  growthStage    String?
+  mainPainPoints Json?
+  goals          Json?
+  operatingHours String?
+  locations      Json?
+  constraints    Json?
+  auditMode      String   @default("quick")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model Department {
+  id          String  @id @default(cuid())
+  workspaceId String
+  name        String
+  headCount   Int?
+  manager     String?
+
+  workspace Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  roles     TeamRole[]
+  workflows Workflow[]
+}
+
+model TeamRole {
+  id               String  @id @default(cuid())
+  departmentId     String
+  title            String
+  responsibilities String?
+  toolsUsed        Json?
+
+  department    Department     @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  workflowSteps WorkflowStep[]
+}
+
+model ToolStackItem {
+  id            String  @id @default(cuid())
+  workspaceId   String
+  name          String
+  category      String?
+  monthlyBudget Float?
+  satisfaction  Int?
+  notes         String?
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+// ─── Workflows ────────────────────────────────────────────────
+
+enum WorkflowStatus {
+  DRAFT
+  ANALYZED
+  APPROVED
+}
+
+model Workflow {
+  id                       String         @id @default(cuid())
+  workspaceId              String
+  departmentId             String?
+  name                     String
+  description              String?
+  trigger                  String?
+  frequency                String?
+  status                   WorkflowStatus @default(DRAFT)
+  automationPotentialScore Float?
+  owner                    String?
+  createdAt                DateTime       @default(now())
+  updatedAt                DateTime       @updatedAt
+
+  workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  department    Department?    @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  steps         WorkflowStep[]
+  painPoints    PainPoint[]
+  opportunities Opportunity[]
+  documents     Document[]
+}
+
+model WorkflowStep {
+  id           String  @id @default(cuid())
+  workflowId   String
+  order        Int
+  name         String
+  description  String?
+  actorRoleId  String?
+  toolUsed     String?
+  inputType    String?
+  outputType   String?
+  timeMinutes  Int?
+  isManual     Boolean @default(true)
+  isBottleneck Boolean @default(false)
+
+  workflow   Workflow      @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  actorRole  TeamRole?     @relation(fields: [actorRoleId], references: [id], onDelete: SetNull)
+  painPoints PainPoint[]
+}
+
+model PainPoint {
+  id          String  @id @default(cuid())
+  workflowId  String?
+  stepId      String?
+  type        String
+  severity    String  @default("medium")
+  description String?
+
+  workflow Workflow?      @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  step     WorkflowStep?  @relation(fields: [stepId], references: [id], onDelete: Cascade)
+}
+
+// ─── AI Analysis Outputs ──────────────────────────────────────
+
+enum OpportunityType {
+  AUTOMATE
+  AUGMENT
+  OPTIMIZE
+  NO_CHANGE
+}
+
+enum OpportunityStatus {
+  NEW
+  REVIEWED
+  APPROVED
+  DISMISSED
+}
+
+model Opportunity {
+  id                     String            @id @default(cuid())
+  workspaceId            String
+  workflowId             String?
+  type                   OpportunityType
+  title                  String
+  currentState           String?
+  recommendedState       String?
+  toolingSuggestion      String?
+  implementationApproach String?
+  expectedImpact         String?
+  risks                  String?
+  technicalNotes         String?
+  confidenceScore        Float?
+  impactScore            Float?
+  effortScore            Float?
+  costScore              Float?
+  urgencyScore           Float?
+  roiScore               Float?
+  automationScore        Float?
+  complexityScore        Float?
+  quadrant               String?
+  status                 OpportunityStatus @default(NEW)
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workflow     Workflow?     @relation(fields: [workflowId], references: [id], onDelete: SetNull)
+  roadmapItems RoadmapItem[]
+}
+
+model ModelRun {
+  id            String   @id @default(cuid())
+  workspaceId   String
+  promptVersion String?
+  inputHash     String?
+  outputHash    String?
+  tokensUsed    Int?
+  latencyMs     Int?
+  cost          Float?
+  createdAt     DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+// ─── Roadmap & Budget ─────────────────────────────────────────
+
+model Roadmap {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  status      String   @default("draft")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace       Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  phases          RoadmapPhase[]
+  budgetEstimates BudgetEstimate[]
+}
+
+model RoadmapPhase {
+  id            String  @id @default(cuid())
+  roadmapId     String
+  name          String
+  order         Int
+  startWeek     Int?
+  durationWeeks Int?
+  description   String?
+
+  roadmap Roadmap       @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
+  items   RoadmapItem[]
+}
+
+model RoadmapItem {
+  id             String  @id @default(cuid())
+  phaseId        String
+  opportunityId  String?
+  estimatedWeeks Int?
+  requiredRoles  Json?
+  dependencies   Json?
+
+  phase       RoadmapPhase @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  opportunity Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+}
+
+model BudgetEstimate {
+  id                   String  @id @default(cuid())
+  workspaceId          String
+  roadmapId            String?
+  category             String
+  itemName             String
+  oneTimeCost          Float?
+  recurringMonthlyCost Float?
+  notes                String?
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  roadmap   Roadmap?  @relation(fields: [roadmapId], references: [id], onDelete: SetNull)
+}
+
+// ─── Outputs ──────────────────────────────────────────────────
+
+enum ReportType {
+  EXECUTIVE_SUMMARY
+  FULL_AUDIT
+  TECHNICAL_ANNEX
+}
+
+model Report {
+  id          String     @id @default(cuid())
+  workspaceId String
+  type        ReportType
+  format      String     @default("pdf")
+  content     Json?
+  fileUrl     String?
+  generatedAt DateTime   @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model Proposal {
+  id          String   @id @default(cuid())
+  workspaceId String
+  title       String
+  clientName  String?
+  content     Json?
+  pdfUrl      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model JobPost {
+  id          String   @id @default(cuid())
+  workspaceId String
+  title       String
+  platform    String?
+  roleType    String?
+  skills      Json?
+  budgetRange String?
+  milestones  Json?
+  content     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model Scope {
+  id             String   @id @default(cuid())
+  workspaceId    String   @unique
+  content        Json?
+  taskBreakdown  Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model Document {
+  id          String   @id @default(cuid())
+  workspaceId String
+  workflowId  String?
+  name        String
+  type        String?
+  path        String?
+  parsedText  String?
+  tags        Json?
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workflow  Workflow?  @relation(fields: [workflowId], references: [id], onDelete: SetNull)
+}
+
+// ─── System ───────────────────────────────────────────────────
+
+model Notification {
+  id          String   @id @default(cuid())
+  workspaceId String
+  type        String
+  title       String
+  message     String?
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  workspaceId String
+  userId      String?
+  action      String
+  entity      String?
+  entityId    String?
+  details     Json?
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model Subscription {
+  id                   String    @id @default(cuid())
+  workspaceId          String    @unique
+  plan                 String    @default("free")
+  status               String    @default("active")
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  currentPeriodEnd     DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model IndustryTemplate {
+  id          String   @id @default(cuid())
+  industry    String
+  name        String
+  description String?
+  departments Json?
+  roles       Json?
+  workflows   Json?
+  painPoints  Json?
+  benchmarks  Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
