@@ -6,11 +6,9 @@ WorkPilot helps service businesses discover what can be automated, augmented wit
 
 - **Framework:** Next.js 16 (App Router) + TypeScript
 - **Styling:** Tailwind CSS v4 + shadcn/ui
-- **Database:** PostgreSQL + Prisma ORM
-- **Auth:** Clerk
-- **AI:** OpenAI GPT-4o with structured outputs
-- **Billing:** Stripe
-- **Email:** Resend
+- **Database:** Firebase Firestore
+- **Auth:** Firebase Auth
+- **AI:** OpenAI GPT-4o-mini with structured outputs
 
 ## Getting Started
 
@@ -22,19 +20,13 @@ WorkPilot helps service businesses discover what can be automated, augmented wit
 npm install
 ```
 
-4. Start the local database and run migrations:
-
-```bash
-npx prisma dev
-```
-
-5. Start the development server:
+4. Start the development server:
 
 ```bash
 npm run dev
 ```
 
-6. Open [http://localhost:3000](http://localhost:3000)
+5. Open [http://localhost:3000](http://localhost:3000)
 
 ## Project Structure
 
@@ -48,6 +40,4 @@ src/
     ui/             # shadcn/ui primitives
   lib/              # Utilities and services
   hooks/            # Custom React hooks
-prisma/
-  schema.prisma     # Database schema
 ```

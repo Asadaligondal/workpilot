@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma"
+import { create } from "./firestore-helpers"
 
 export async function createNotification(params: {
   workspaceId: string
@@ -6,12 +6,11 @@ export async function createNotification(params: {
   title: string
   message?: string
 }) {
-  return prisma.notification.create({
-    data: {
-      workspaceId: params.workspaceId,
-      type: params.type,
-      title: params.title,
-      message: params.message,
-    },
+  return create("notifications", {
+    workspaceId: params.workspaceId,
+    type: params.type,
+    title: params.title,
+    message: params.message || null,
+    isRead: false,
   })
 }

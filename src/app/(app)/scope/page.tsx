@@ -18,7 +18,7 @@ export default async function ScopePage() {
         actions={<GenerateScopeButton />}
       />
       <div className="flex-1 p-6">
-        <ScopeClient scope={scope} />
+        <ScopeClient scope={scope as any} />
       </div>
     </>
   )

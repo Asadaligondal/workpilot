@@ -25,7 +25,7 @@ export default async function ProposalsPage({
       />
       <div className="flex-1 p-6">
         <ProposalsClient
-          proposals={proposals}
+          proposals={proposals as any}
           initialProposalId={initialProposalId}
         />
       </div>

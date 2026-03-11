@@ -73,9 +73,14 @@ export default async function AuditLogPage({
               <TableBody>
                 {logs.map((log) => (
                   <TableRow key={log.id} className="border-border">
-                    <TableCell className="text-muted-foreground">
-                      {new Date(log.createdAt).toLocaleString()}
-                    </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {(() => {
+                          const createdAt = log.createdAt instanceof Date 
+                            ? log.createdAt 
+                            : (log.createdAt as any)?.toDate?.() || new Date(log.createdAt as any)
+                          return createdAt.toLocaleString()
+                        })()}
+                      </TableCell>
                     <TableCell>
                       {log.user?.name ?? log.user?.email ?? "—"}
                     </TableCell>

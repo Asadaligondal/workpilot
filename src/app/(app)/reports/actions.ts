@@ -1,21 +1,27 @@
 "use server"
 
-import { prisma } from "@/lib/prisma"
 import { getActiveWorkspaceId } from "@/lib/workspace"
 import { logAudit } from "@/lib/audit"
 import { revalidatePath } from "next/cache"
-import type { ReportType } from "@prisma/client"
+import type { ReportType } from "@/types"
+import { findFirst, findMany, findUnique, where, create, update, toPlain } from "@/lib/firestore-helpers"
+import { Timestamp } from "firebase-admin/firestore"
+import { db } from "@/lib/firebase"
 
 export async function getReports() {
   try {
     const workspaceId = await getActiveWorkspaceId()
     if (!workspaceId) return []
 
-    const reports = await prisma.report.findMany({
-      where: { workspaceId },
-      orderBy: { generatedAt: "desc" },
+    const reports = await findMany("reports", [
+      where("workspaceId", "==", workspaceId),
+    ])
+    reports.sort((a: any, b: any) => {
+      const aTime = a.generatedAt?._seconds ?? a.createdAt?._seconds ?? 0
+      const bTime = b.generatedAt?._seconds ?? b.createdAt?._seconds ?? 0
+      return bTime - aTime
     })
-    return reports
+    return toPlain(reports)
   } catch (err) {
     console.error("getReports:", err)
     return []
@@ -27,10 +33,9 @@ export async function getReport(id: string) {
     const workspaceId = await getActiveWorkspaceId()
     if (!workspaceId) return null
 
-    const report = await prisma.report.findFirst({
-      where: { id, workspaceId },
-    })
-    return report
+    const report = await findUnique("reports", id)
+    if (!report || report.workspaceId !== workspaceId) return null
+    return toPlain(report)
   } catch (err) {
     console.error("getReport:", err)
     return null
@@ -191,57 +196,66 @@ export async function generateReport(
   try {
     const workspaceId = await getActiveWorkspaceId()
     if (!workspaceId) return { success: false, error: "No active workspace" }
+
     const [businessProfile, workflows, opportunities, roadmaps, budgetEstimates] =
       await Promise.all([
-        prisma.businessProfile.findFirst({ where: { workspaceId } }),
-        prisma.workflow.findMany({
-          where: { workspaceId },
-          include: { steps: true },
-        }),
-        prisma.opportunity.findMany({ where: { workspaceId } }),
-        prisma.roadmap.findMany({
-          where: { workspaceId },
-          include: { phases: { include: { items: true } } },
-        }),
-        prisma.budgetEstimate.findMany({ where: { workspaceId } }),
+        findFirst("businessProfiles", [where("workspaceId", "==", workspaceId)]),
+        findMany("workflows", [where("workspaceId", "==", workspaceId)]),
+        findMany("opportunities", [where("workspaceId", "==", workspaceId)]),
+        findMany("roadmaps", [where("workspaceId", "==", workspaceId)]),
+        findMany("budgetEstimates", [where("workspaceId", "==", workspaceId)]),
       ])
 
-    const workspace = await prisma.workspace.findUnique({
-      where: { id: workspaceId },
-      select: { name: true },
-    })
+    const workflowsWithSteps = await Promise.all(
+      workflows.map(async (wf: any) => {
+        const steps = await findMany("workflowSteps", [where("workflowId", "==", wf.id)])
+        return { ...wf, steps }
+      })
+    )
+
+    const roadmapsWithPhases = await Promise.all(
+      roadmaps.map(async (rm: any) => {
+        const phases = await findMany("roadmapPhases", [where("roadmapId", "==", rm.id)])
+        const phasesWithItems = await Promise.all(
+          phases.map(async (phase: any) => {
+            const items = await findMany("roadmapItems", [where("phaseId", "==", phase.id)])
+            return { ...phase, items }
+          })
+        )
+        return { ...rm, phases: phasesWithItems }
+      })
+    )
+
+    const workspaceDoc = await db.collection("workspaces").doc(workspaceId).get()
+    const workspace = workspaceDoc.exists ? workspaceDoc.data() : null
 
     const { html, json } = buildReportContent(
       {
         companyName: workspace?.name || businessProfile?.companyName || "Company",
         businessProfile,
-        workflows,
+        workflows: workflowsWithSteps,
         opportunities,
-        roadmaps,
+        roadmaps: roadmapsWithPhases,
         budgetEstimates,
       },
       type
     )
 
-    const report = await prisma.report.create({
-      data: {
-        workspaceId,
-        type,
-        format: format || "pdf",
-        content: json as object,
-        fileUrl: null,
-      },
+    const report = await create("reports", {
+      workspaceId,
+      type,
+      format: format || "pdf",
+      generatedAt: Timestamp.now(),
+      content: json as object,
+      fileUrl: null,
     })
 
-    await prisma.report.update({
-      where: { id: report.id },
-      data: {
-        content: {
-          ...json,
-          html,
-          format,
-        } as object,
-      },
+    await update("reports", report.id, {
+      content: {
+        ...json,
+        html,
+        format,
+      } as object,
     })
 
     const user = await import("@/lib/auth").then((m) => m.requireUser())

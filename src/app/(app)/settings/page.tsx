@@ -24,7 +24,7 @@ async function getWorkspace() {
 }
 
 export default async function SettingsPage() {
-  const workspace = await getWorkspace()
+  const workspace = await getWorkspace() as any
 
   return (
     <>
@@ -47,10 +47,16 @@ export default async function SettingsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <SettingsForm
-                  name={workspace?.name ?? ""}
-                  industry={workspace?.industry ?? ""}
-                />
+                {workspace ? (
+                  <SettingsForm
+                    name={workspace.name ?? ""}
+                    industry={workspace.industry ?? ""}
+                  />
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No active workspace. Create one from the sidebar to get started.
+                  </p>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

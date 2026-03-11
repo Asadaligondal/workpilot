@@ -162,7 +162,7 @@ export function GenerateJobPostDialog({
 
   async function loadOpportunities() {
     const list = await getOpportunities({})
-    setOpportunities(list.map((o) => ({ id: o.id, title: o.title })))
+    setOpportunities(list.map((o: any) => ({ id: o.id, title: o.title })))
   }
 
   function handleOpenChange(open: boolean) {
@@ -208,7 +208,7 @@ export function GenerateJobPostDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>
+      <DialogTrigger>
         <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700">
           <PlusIcon className="mr-1 h-4 w-4" />
           Generate Job Post
@@ -223,7 +223,7 @@ export function GenerateJobPostDialog({
             <Label>Opportunity (optional)</Label>
             <Select
               value={opportunityId || "none"}
-              onValueChange={(v) => setOpportunityId(v === "none" ? "" : v)}
+              onValueChange={(v) => setOpportunityId(v === "none" ? "" : (v || ""))}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select opportunity" />
@@ -249,7 +249,7 @@ export function GenerateJobPostDialog({
           </div>
           <div className="space-y-2">
             <Label>Platform</Label>
-            <Select value={platform} onValueChange={setPlatform}>
+            <Select value={platform} onValueChange={(v) => setPlatform(v || "")}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>

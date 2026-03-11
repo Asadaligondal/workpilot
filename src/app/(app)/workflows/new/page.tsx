@@ -82,7 +82,7 @@ export default function NewWorkflowPage() {
   const [csvError, setCsvError] = useState<string | null>(null)
 
   useEffect(() => {
-    getDepartments().then(setDepartments)
+    getDepartments().then((d) => setDepartments(d as any))
   }, [])
 
   function applyTemplate(template: (typeof WORKFLOW_TEMPLATES)[0]) {
@@ -206,7 +206,7 @@ export default function NewWorkflowPage() {
     <>
       <PageHeader title="Workflow Intake Center" description="Add workflows via guided form, template, or CSV import" />
       <div className="flex-1 p-6">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v || "manual")} className="space-y-6">
           <TabsList className="grid w-full max-w-md grid-cols-3">
             <TabsTrigger value="guided" className="gap-2">
               <ClipboardListIcon className="h-4 w-4" />
@@ -244,9 +244,11 @@ export default function NewWorkflowPage() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="department">Department</Label>
-                      <Select value={departmentId} onValueChange={setDepartmentId}>
+                      <Select value={departmentId} onValueChange={(v) => setDepartmentId(v || "")}>
                         <SelectTrigger id="department" className="w-full">
-                          <SelectValue placeholder="Select department" />
+                          <SelectValue placeholder="Select department">
+                            {departmentId ? departments.find((d) => d.id === departmentId)?.name ?? "Select department" : undefined}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="">None</SelectItem>
@@ -268,7 +270,7 @@ export default function NewWorkflowPage() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="frequency">Frequency</Label>
-                      <Select value={frequency} onValueChange={setFrequency}>
+                      <Select value={frequency} onValueChange={(v) => setFrequency(v || "")}>
                         <SelectTrigger id="frequency" className="w-full">
                           <SelectValue placeholder="Select frequency" />
                         </SelectTrigger>
@@ -323,7 +325,7 @@ export default function NewWorkflowPage() {
                                 onChange={(e) => {
                                   const v = e.target.value
                                   const n = v ? parseInt(v, 10) : undefined
-                                  updateStep(i, "timeMinutes", Number.isNaN(n) ? undefined : n)
+                                  updateStep(i, "timeMinutes", Number.isNaN(n) ? 0 : (n ?? 0))
                                 }}
                                 placeholder="e.g. 15"
                               />
@@ -436,9 +438,11 @@ export default function NewWorkflowPage() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="csv-dept">Department</Label>
-                    <Select value={csvDepartmentId} onValueChange={setCsvDepartmentId}>
+                    <Select value={csvDepartmentId} onValueChange={(v) => setCsvDepartmentId(v || "")}>
                       <SelectTrigger id="csv-dept" className="w-full">
-                        <SelectValue placeholder="Select department" />
+                        <SelectValue placeholder="Select department">
+                          {csvDepartmentId ? departments.find((d) => d.id === csvDepartmentId)?.name ?? "Select department" : undefined}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="">None</SelectItem>

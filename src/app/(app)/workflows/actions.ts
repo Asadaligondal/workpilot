@@ -1,10 +1,10 @@
 "use server"
 
-import { prisma } from "@/lib/prisma"
 import { requireUser } from "@/lib/auth"
 import { getActiveWorkspaceId } from "@/lib/workspace"
 import { logAudit } from "@/lib/audit"
 import { revalidatePath } from "next/cache"
+import { findFirst, findMany, findUnique, where, create, deleteRecord, orderBy } from "@/lib/firestore-helpers"
 
 export type CreateWorkflowStepInput = {
   name: string
@@ -32,25 +32,21 @@ export async function createWorkflow(data: CreateWorkflowInput) {
     const workspaceId = await getActiveWorkspaceId()
     if (!workspaceId) return { success: false, error: "No active workspace" }
 
-    const member = await prisma.workspaceMember.findFirst({
-      where: {
-        workspaceId,
-        userId: user.id,
-        role: { in: ["OWNER", "ADMIN", "MEMBER"] },
-      },
-    })
+    const member = await findFirst("workspaceMembers", [
+      where("workspaceId", "==", workspaceId),
+      where("userId", "==", user.id),
+    ])
     if (!member) return { success: false, error: "Insufficient permissions" }
 
-    const workflow = await prisma.workflow.create({
-      data: {
-        workspaceId,
-        departmentId: data.departmentId ?? null,
-        name: data.name,
-        description: data.description ?? null,
-        trigger: data.trigger ?? null,
-        frequency: data.frequency ?? null,
-        owner: data.owner ?? null,
-      },
+    const workflow = await create("workflows", {
+      workspaceId,
+      departmentId: data.departmentId ?? null,
+      name: data.name,
+      description: data.description ?? null,
+      trigger: data.trigger ?? null,
+      frequency: data.frequency ?? null,
+      owner: data.owner ?? null,
+      status: "DRAFT",
     })
 
     for (let i = 0; i < data.steps.length; i++) {
@@ -58,47 +54,39 @@ export async function createWorkflow(data: CreateWorkflowInput) {
       let actorRoleId: string | null = null
 
       if (step.actorRole?.trim() && data.departmentId) {
-        const existing = await prisma.teamRole.findFirst({
-          where: {
-            departmentId: data.departmentId,
-            title: step.actorRole.trim(),
-          },
-        })
+        const existing = await findFirst("teamRoles", [
+          where("departmentId", "==", data.departmentId),
+          where("title", "==", step.actorRole.trim()),
+        ])
         if (existing) {
           actorRoleId = existing.id
         } else {
-          const created = await prisma.teamRole.create({
-            data: {
-              departmentId: data.departmentId,
-              title: step.actorRole.trim(),
-            },
+          const created = await create("teamRoles", {
+            departmentId: data.departmentId,
+            title: step.actorRole.trim(),
           })
           actorRoleId = created.id
         }
       }
 
-      const createdStep = await prisma.workflowStep.create({
-        data: {
-          workflowId: workflow.id,
-          order: i,
-          name: step.name,
-          description: step.description ?? null,
-          actorRoleId,
-          toolUsed: step.toolUsed ?? null,
-          timeMinutes: step.timeMinutes ?? null,
-          isManual: step.isManual ?? true,
-        },
+      const createdStep = await create("workflowSteps", {
+        workflowId: workflow.id,
+        order: i,
+        name: step.name,
+        description: step.description ?? null,
+        actorRoleId,
+        toolUsed: step.toolUsed ?? null,
+        timeMinutes: step.timeMinutes ?? null,
+        isManual: step.isManual ?? true,
       })
 
       if (step.painPoints?.trim()) {
-        await prisma.painPoint.create({
-          data: {
-            workflowId: workflow.id,
-            stepId: createdStep.id,
-            type: "general",
-            severity: "medium",
-            description: step.painPoints.trim(),
-          },
+        await create("painPoints", {
+          workflowId: workflow.id,
+          stepId: createdStep.id,
+          type: "general",
+          severity: "medium",
+          description: step.painPoints.trim(),
         })
       }
     }
@@ -125,21 +113,32 @@ export async function deleteWorkflow(id: string) {
     if (!workspaceId) return { success: false, error: "No active workspace" }
 
     const user = await requireUser()
-    const member = await prisma.workspaceMember.findFirst({
-      where: {
-        workspaceId,
-        userId: user.id,
-        role: { in: ["OWNER", "ADMIN", "MEMBER"] },
-      },
-    })
+    const member = await findFirst("workspaceMembers", [
+      where("workspaceId", "==", workspaceId),
+      where("userId", "==", user.id),
+    ])
     if (!member) return { success: false, error: "Insufficient permissions" }
 
-    const workflow = await prisma.workflow.findFirst({
-      where: { id, workspaceId },
-    })
-    if (!workflow) return { success: false, error: "Workflow not found" }
+    const workflow = await findUnique("workflows", id)
+    if (!workflow || workflow.workspaceId !== workspaceId)
+      return { success: false, error: "Workflow not found" }
 
-    await prisma.workflow.delete({ where: { id } })
+    // Delete all steps and pain points first
+    const steps = await findMany("workflowSteps", [where("workflowId", "==", id)])
+    for (const step of steps) {
+      const painPoints = await findMany("painPoints", [where("stepId", "==", step.id)])
+      for (const pp of painPoints) {
+        await deleteRecord("painPoints", pp.id)
+      }
+      await deleteRecord("workflowSteps", step.id)
+    }
+    
+    const workflowPainPoints = await findMany("painPoints", [where("workflowId", "==", id)])
+    for (const pp of workflowPainPoints) {
+      await deleteRecord("painPoints", pp.id)
+    }
+
+    await deleteRecord("workflows", id)
 
     revalidatePath("/workflows")
     return { success: true }
@@ -154,11 +153,12 @@ export async function getDepartments() {
     const workspaceId = await getActiveWorkspaceId()
     if (!workspaceId) return []
 
-    const departments = await prisma.department.findMany({
-      where: { workspaceId },
-      orderBy: { name: "asc" },
-    })
+    const departments = await findMany("departments", [
+      where("workspaceId", "==", workspaceId),
+    ])
     return departments
+      .map((d: any) => ({ id: d.id, name: d.name ?? "" }))
+      .sort((a, b) => a.name.localeCompare(b.name))
   } catch (err) {
     console.error("getDepartments:", err)
     return []
@@ -170,16 +170,31 @@ export async function getWorkflows() {
     const workspaceId = await getActiveWorkspaceId()
     if (!workspaceId) return []
 
-    const workflows = await prisma.workflow.findMany({
-      where: { workspaceId },
-      include: {
-        department: true,
-        _count: { select: { steps: true } },
-      },
-      orderBy: { createdAt: "desc" },
-    })
+    const workflows = await findMany("workflows", [
+      where("workspaceId", "==", workspaceId),
+    ])
 
-    return workflows
+    const workflowsWithData = await Promise.all(
+      workflows.map(async (wf: any) => {
+        const department = wf.departmentId
+          ? await findUnique("departments", wf.departmentId)
+          : null
+        const steps = await findMany("workflowSteps", [where("workflowId", "==", wf.id)])
+
+        return {
+          id: wf.id,
+          name: wf.name ?? "",
+          description: wf.description ?? null,
+          status: wf.status ?? "DRAFT",
+          automationPotentialScore: wf.automationPotentialScore ?? null,
+          owner: wf.owner ?? null,
+          department: department ? { id: department.id, name: department.name ?? "" } : null,
+          _count: { steps: steps.length },
+        }
+      })
+    )
+
+    return workflowsWithData.sort((a, b) => b.name.localeCompare(a.name))
   } catch (err) {
     console.error("getWorkflows:", err)
     return []

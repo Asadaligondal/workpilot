@@ -1,19 +1,23 @@
 "use server"
 
-import { prisma } from "@/lib/prisma"
 import { getActiveWorkspaceId } from "@/lib/workspace"
 import { revalidatePath } from "next/cache"
+import { findMany, where, create, toPlain } from "@/lib/firestore-helpers"
 
 export async function getJobPosts() {
   try {
     const workspaceId = await getActiveWorkspaceId()
     if (!workspaceId) return []
 
-    const jobPosts = await prisma.jobPost.findMany({
-      where: { workspaceId },
-      orderBy: { createdAt: "desc" },
+    const jobPosts = await findMany("jobPosts", [
+      where("workspaceId", "==", workspaceId),
+    ])
+    jobPosts.sort((a: any, b: any) => {
+      const aTime = a.createdAt?._seconds ?? 0
+      const bTime = b.createdAt?._seconds ?? 0
+      return bTime - aTime
     })
-    return jobPosts
+    return toPlain(jobPosts)
   } catch (err) {
     console.error("getJobPosts:", err)
     return []
@@ -74,9 +78,9 @@ export async function generateJobPost(
   try {
     const workspaceId = await getActiveWorkspaceId()
     if (!workspaceId) return { success: false, error: "No active workspace" }
-    const opportunities = await prisma.opportunity.findMany({
-      where: { workspaceId },
-    })
+    const opportunities = await findMany("opportunities", [
+      where("workspaceId", "==", workspaceId),
+    ])
 
     const content = buildJobPostContent({
       title: title || "Automation Implementation Specialist",
@@ -84,19 +88,17 @@ export async function generateJobPost(
       roleType: roleType || "Freelancer",
       skills: skills || [],
       budgetRange: budgetRange || "To be discussed",
-      opportunities,
+      opportunities: opportunities as any,
     })
 
-    const jobPost = await prisma.jobPost.create({
-      data: {
-        workspaceId,
-        title: title || "Automation Implementation Specialist",
-        platform: platform || null,
-        roleType: roleType || null,
-        skills: skills.length > 0 ? skills : null,
-        budgetRange: budgetRange || null,
-        content,
-      },
+    const jobPost = await create("jobPosts", {
+      workspaceId,
+      title: title || "Automation Implementation Specialist",
+      platform: platform || null,
+      roleType: roleType || null,
+      skills: skills.length > 0 ? skills : null,
+      budgetRange: budgetRange || null,
+      content,
     })
 
     revalidatePath("/job-posts")

@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { generateReport } from "./actions"
-import type { ReportType } from "@prisma/client"
+import type { ReportType } from "@/types"
 import {
   FileTextIcon,
   DownloadIcon,
@@ -70,7 +70,7 @@ function GenerateReportDialog({ showButton = true }: { showButton?: boolean }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {showButton && (
-        <DialogTrigger asChild>
+        <DialogTrigger>
           <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700">
             <PlusIcon className="mr-1 h-4 w-4" />
             Generate Report

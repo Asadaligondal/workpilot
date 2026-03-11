@@ -63,7 +63,7 @@ export default async function RoadmapPage() {
                     </CardHeader>
                     <CardContent className="flex-1 space-y-3">
                       {phase?.items?.length ? (
-                        phase.items.map((item) => (
+                        phase.items.map((item: any) => (
                           <Card
                             key={item.id}
                             className="border bg-card p-3 shadow-sm"

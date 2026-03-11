@@ -1,9 +1,9 @@
 "use server"
 
-import { prisma } from "@/lib/prisma"
 import { getActiveWorkspaceId } from "@/lib/workspace"
 import { revalidatePath } from "next/cache"
-import type { OpportunityType, OpportunityStatus } from "@prisma/client"
+import type { OpportunityStatus } from "@/types"
+import { findMany, findUnique, where, update, toPlain } from "@/lib/firestore-helpers"
 
 export type OpportunityFilters = {
   type?: string
@@ -17,36 +17,46 @@ export async function getOpportunities(filters: OpportunityFilters = {}) {
     const workspaceId = await getActiveWorkspaceId()
     if (!workspaceId) return []
 
-    const where: Parameters<typeof prisma.opportunity.findMany>[0]["where"] = {
-      workspaceId,
-    }
+    let opportunities = await findMany("opportunities", [
+      where("workspaceId", "==", workspaceId),
+    ])
 
     if (filters.type && filters.type !== "all") {
-      where.type = filters.type as OpportunityType
+      opportunities = opportunities.filter((o: any) => o.type === filters.type)
     }
     if (filters.status && filters.status !== "all") {
-      where.status = filters.status as OpportunityStatus
+      opportunities = opportunities.filter((o: any) => o.status === filters.status)
     }
     if (filters.quadrant && filters.quadrant !== "all") {
-      where.quadrant = filters.quadrant
+      opportunities = opportunities.filter((o: any) => o.quadrant === filters.quadrant)
     }
     if (filters.search?.trim()) {
-      where.OR = [
-        { title: { contains: filters.search.trim(), mode: "insensitive" } },
-        {
-          workflow: {
-            name: { contains: filters.search.trim(), mode: "insensitive" },
-          },
-        },
-      ]
+      const searchLower = filters.search.trim().toLowerCase()
+      opportunities = opportunities.filter((o: any) =>
+        o.title?.toLowerCase().includes(searchLower)
+      )
     }
 
-    const opportunities = await prisma.opportunity.findMany({
-      where,
-      include: { workflow: true },
-      orderBy: [{ roiScore: "desc" }, { impactScore: "desc" }],
+    opportunities.sort((a: any, b: any) => {
+      const aRoi = a.roiScore ?? 0
+      const bRoi = b.roiScore ?? 0
+      if (aRoi !== bRoi) return bRoi - aRoi
+      return (b.impactScore ?? 0) - (a.impactScore ?? 0)
     })
-    return opportunities
+
+    const opportunitiesWithWorkflows = await Promise.all(
+      opportunities.map(async (opp: any) => {
+        const workflow = opp.workflowId
+          ? await findUnique("workflows", opp.workflowId)
+          : null
+        return {
+          ...opp,
+          workflow: workflow ? { id: workflow.id, name: workflow.name ?? "" } : null,
+        }
+      })
+    )
+
+    return toPlain(opportunitiesWithWorkflows)
   } catch (err) {
     console.error("getOpportunities:", err)
     return []
@@ -58,11 +68,17 @@ export async function getOpportunity(id: string) {
     const workspaceId = await getActiveWorkspaceId()
     if (!workspaceId) return null
 
-    const opportunity = await prisma.opportunity.findFirst({
-      where: { id, workspaceId },
-      include: { workflow: true },
+    const opportunity = await findUnique("opportunities", id)
+    if (!opportunity || opportunity.workspaceId !== workspaceId) return null
+
+    const workflow = opportunity.workflowId
+      ? await findUnique("workflows", opportunity.workflowId)
+      : null
+
+    return toPlain({
+      ...opportunity,
+      workflow: workflow ? { id: workflow.id, name: workflow.name ?? "" } : null,
     })
-    return opportunity
   } catch (err) {
     console.error("getOpportunity:", err)
     return null
@@ -74,10 +90,11 @@ export async function updateOpportunityStatus(id: string, status: OpportunitySta
     const workspaceId = await getActiveWorkspaceId()
     if (!workspaceId) return { success: false, error: "No active workspace" }
 
-    await prisma.opportunity.updateMany({
-      where: { id, workspaceId },
-      data: { status },
-    })
+    const opportunity = await findUnique("opportunities", id)
+    if (!opportunity || opportunity.workspaceId !== workspaceId)
+      return { success: false, error: "Opportunity not found" }
+
+    await update("opportunities", id, { status })
 
     revalidatePath("/opportunities")
     revalidatePath(`/opportunities/${id}`)

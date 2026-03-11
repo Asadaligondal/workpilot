@@ -9,7 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { updateOpportunityStatus } from "../actions"
-import type { OpportunityStatus } from "@prisma/client"
+import type { OpportunityStatus } from "@/types"
 
 const STATUS_LABELS: Record<OpportunityStatus, string> = {
   NEW: "New",
@@ -27,7 +27,8 @@ export function OpportunityDetailClient({
 }) {
   const [isPending, startTransition] = useTransition()
 
-  const handleChange = (value: string) => {
+  const handleChange = (value: string | null) => {
+    if (!value) return
     startTransition(async () => {
       await updateOpportunityStatus(opportunityId, value as OpportunityStatus)
     })

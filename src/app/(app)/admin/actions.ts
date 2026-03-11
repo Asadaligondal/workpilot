@@ -1,9 +1,9 @@
 "use server"
 
-import { clerkClient } from "@clerk/nextjs/server"
 import { revalidatePath } from "next/cache"
-import { prisma } from "@/lib/prisma"
 import { requireUser, isAdmin } from "@/lib/auth"
+import { findMany, findFirst, findUnique, where, orderBy, limit, update, toPlain } from "@/lib/firestore-helpers"
+import { db } from "@/lib/firebase"
 
 export type AdminStats = Awaited<ReturnType<typeof getAdminStats>>
 export type UserWithRole = Awaited<ReturnType<typeof getUsers>>[number]
@@ -13,97 +13,108 @@ export async function getAdminStats() {
   await requireUser()
   if (!(await isAdmin())) throw new Error("Access denied")
 
+  // Get counts using Firestore - fetch all and count (for small datasets this is fine)
   const [
-    totalUsers,
-    totalWorkspaces,
-    totalWorkflows,
-    totalOpportunities,
-    totalReports,
-    activeSubscriptions,
+    users,
+    workspaces,
+    workflows,
+    opportunities,
+    reports,
+    subscriptions,
   ] = await Promise.all([
-    prisma.user.count(),
-    prisma.workspace.count(),
-    prisma.workflow.count(),
-    prisma.opportunity.count(),
-    prisma.report.count(),
-    prisma.subscription.count({ where: { status: "active" } }),
+    db.collection("users").select().get(),
+    db.collection("workspaces").select().get(),
+    db.collection("workflows").select().get(),
+    db.collection("opportunities").select().get(),
+    db.collection("reports").select().get(),
+    db.collection("subscriptions").where("status", "==", "active").select().get(),
   ])
 
   return {
-    totalUsers,
-    totalWorkspaces,
-    totalWorkflows,
-    totalOpportunities,
-    totalReports,
-    activeSubscriptions,
+    totalUsers: users.size,
+    totalWorkspaces: workspaces.size,
+    totalWorkflows: workflows.size,
+    totalOpportunities: opportunities.size,
+    totalReports: reports.size,
+    activeSubscriptions: subscriptions.size,
   }
 }
 
-export async function getRecentAuditLogs(limit = 20) {
+export async function getRecentAuditLogs(limitCount = 20) {
   await requireUser()
   if (!(await isAdmin())) throw new Error("Access denied")
 
-  const logs = await prisma.auditLog.findMany({
-    take: limit,
-    orderBy: { createdAt: "desc" },
-    include: {
-      workspace: { select: { name: true } },
-      user: { select: { name: true, email: true } },
-    },
-  })
+  const logs = await findMany("auditLogs", [
+    orderBy("createdAt", "desc"),
+    limit(limitCount),
+  ])
 
-  return logs
+  // Get workspace and user data
+  const logsWithRelations = await Promise.all(
+    logs.map(async (log) => {
+      const workspace = log.workspaceId
+        ? await findUnique("workspaces", log.workspaceId)
+        : null
+
+      let user = null
+      if (log.userId) {
+        user = await findUnique("users", log.userId)
+        if (!user) {
+          user = await findFirst("users", [where("firebaseUid", "==", log.userId)])
+        }
+      }
+
+      return {
+        ...log,
+        createdAt: log.createdAt,
+        workspace: workspace ? { name: workspace.name } : null,
+        user: user ? { name: user.name, email: user.email } : null,
+      } as typeof log & { workspace: { name: string } | null; user: { name: string; email: string } | null }
+    })
+  )
+
+  return toPlain(logsWithRelations)
 }
 
 export async function getUsers() {
   await requireUser()
   if (!(await isAdmin())) throw new Error("Access denied")
 
-  const users = await prisma.user.findMany({
-    orderBy: { createdAt: "desc" },
-    include: {
-      memberships: { select: { workspaceId: true } },
-    },
-  })
+  const users = await findMany("users", [orderBy("createdAt", "desc")])
 
-  const client = await clerkClient()
-  const withRoles = await Promise.all(
+  // Get workspace counts for each user
+  const usersWithCounts = await Promise.all(
     users.map(async (u) => {
-      try {
-        const clerkUser = await client.users.getUser(u.clerkId)
-        const role = (clerkUser.publicMetadata?.role as string) ?? "USER"
-        return { ...u, role }
-      } catch {
-        return { ...u, role: "USER" }
+      const memberships = await findMany("workspaceMembers", [
+        where("userId", "==", u.id),
+      ])
+      
+      return {
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        role: u.role || "USER",
+        createdAt: u.createdAt,
+        workspaceCount: memberships.length,
       }
     })
   )
 
-  return withRoles.map((u) => ({
-    id: u.id,
-    name: u.name,
-    email: u.email,
-    role: u.role,
-    createdAt: u.createdAt,
-    workspaceCount: u.memberships.length,
-  }))
+  return toPlain(usersWithCounts)
 }
 
 export async function updateUserRole(userId: string, role: string) {
   await requireUser()
   if (!(await isAdmin())) throw new Error("Access denied")
 
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { clerkId: true },
-  })
-
-  if (!user) throw new Error("User not found")
-
-  const client = await clerkClient()
-  await client.users.updateUserMetadata(user.clerkId, {
-    publicMetadata: { role },
-  })
+  const user = await findUnique("users", userId)
+  if (!user) {
+    const userByUid = await findFirst("users", [where("firebaseUid", "==", userId)])
+    if (!userByUid) throw new Error("User not found")
+    await update("users", userByUid.id, { role })
+  } else {
+    await update("users", user.id, { role })
+  }
 
   revalidatePath("/admin")
 }

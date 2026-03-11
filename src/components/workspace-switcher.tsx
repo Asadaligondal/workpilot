@@ -1,6 +1,7 @@
 "use client"
 
 import { useTransition } from "react"
+import { useRouter } from "next/navigation"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,7 +26,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { BoltIcon, ChevronsUpDownIcon, PlusIcon, CheckIcon } from "lucide-react"
+import { BoltIcon, ChevronsUpDownIcon, PlusIcon, CheckIcon, LoaderIcon } from "lucide-react"
 import { switchWorkspace, createWorkspace } from "@/app/(app)/actions"
 import { useState } from "react"
 
@@ -39,6 +40,7 @@ export function WorkspaceSwitcher({
   activeWorkspaceId,
 }: WorkspaceSwitcherProps) {
   const { isMobile } = useSidebar()
+  const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [showCreate, setShowCreate] = useState(false)
   const [newName, setNewName] = useState("")
@@ -46,7 +48,11 @@ export function WorkspaceSwitcher({
   const active = workspaces.find((w) => w.id === activeWorkspaceId) ?? workspaces[0]
 
   function handleSwitch(id: string) {
-    startTransition(() => switchWorkspace(id))
+    if (id === activeWorkspaceId) return
+    startTransition(async () => {
+      await switchWorkspace(id)
+      router.refresh()
+    })
   }
 
   function handleCreate() {
@@ -55,11 +61,20 @@ export function WorkspaceSwitcher({
       await createWorkspace({ name: newName.trim() })
       setNewName("")
       setShowCreate(false)
+      router.refresh()
     })
   }
 
   return (
     <>
+      {isPending && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/60 backdrop-blur-sm">
+          <div className="flex items-center gap-3 rounded-lg border bg-background px-6 py-4 shadow-lg">
+            <LoaderIcon className="h-5 w-5 animate-spin text-indigo-600" />
+            <span className="text-sm font-medium">Switching workspace...</span>
+          </div>
+        </div>
+      )}
       <SidebarMenu>
         <SidebarMenuItem>
           <DropdownMenu>

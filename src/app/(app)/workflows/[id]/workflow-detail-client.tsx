@@ -557,12 +557,12 @@ export function WorkflowDetailClient({ workflow }: { workflow: Workflow }) {
                           onClick={() =>
                             handleUpdateStep(step.id, {
                               name: editingStep.name,
-                              description: editingStep.description,
-                              actorRoleId: editingStep.actorRoleId,
-                              toolUsed: editingStep.toolUsed,
-                              inputType: editingStep.inputType,
-                              outputType: editingStep.outputType,
-                              timeMinutes: editingStep.timeMinutes,
+                              description: editingStep.description ?? undefined,
+                              actorRoleId: editingStep.actorRoleId ?? undefined,
+                              toolUsed: editingStep.toolUsed ?? undefined,
+                              inputType: editingStep.inputType ?? undefined,
+                              outputType: editingStep.outputType ?? undefined,
+                              timeMinutes: editingStep.timeMinutes ?? undefined,
                               isManual: editingStep.isManual,
                               isBottleneck: editingStep.isBottleneck,
                             })

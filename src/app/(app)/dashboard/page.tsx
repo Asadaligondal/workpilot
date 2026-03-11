@@ -8,14 +8,14 @@ import {
   LightbulbIcon,
   DollarSignIcon,
   PlusIcon,
-  PlayIcon,
   FileDownIcon,
   ClockIcon,
 } from "lucide-react"
 import Link from "next/link"
 import { getActiveWorkspaceId } from "@/lib/workspace"
-import { prisma } from "@/lib/prisma"
+import { findMany, findUnique, where } from "@/lib/firestore-helpers"
 import { cn } from "@/lib/utils"
+import { RunAnalysisButton } from "./run-analysis-button"
 
 const typeBadgeClass: Record<string, string> = {
   AUTOMATE: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30",
@@ -40,32 +40,63 @@ export default async function DashboardPage() {
   let workflowCount = 0
   let opportunityCount = 0
   let estimatedSavings = 0
-  let topOpportunities: Awaited<
-    ReturnType<typeof prisma.opportunity.findMany<{ include: { workflow: true } }>>
-  > = []
+  let activeWorkspaceId: string | null = null
+  let topOpportunities: Array<{
+    id: string
+    title: string
+    type: string
+    impactScore: number | null
+    roiScore: number | null
+    workflow: { name: string } | null
+  }> = []
 
   try {
     const workspaceId = await getActiveWorkspaceId()
+    activeWorkspaceId = workspaceId
     if (workspaceId) {
-      const [workflows, opportunities, top] = await Promise.all([
-        prisma.workflow.count({ where: { workspaceId } }),
-        prisma.opportunity.count({ where: { workspaceId } }),
-        prisma.opportunity.findMany({
-          where: { workspaceId },
-          include: { workflow: true },
-          orderBy: [{ roiScore: "desc" }, { impactScore: "desc" }],
-          take: 5,
-        }),
+      const [workflows, opportunities] = await Promise.all([
+        findMany("workflows", [where("workspaceId", "==", workspaceId)]),
+        findMany("opportunities", [where("workspaceId", "==", workspaceId)]),
       ])
-      workflowCount = workflows
-      opportunityCount = opportunities
-      topOpportunities = top
+      
+      workflowCount = workflows.length
+      opportunityCount = opportunities.length
 
-      const savingsResult = await prisma.opportunity.aggregate({
-        where: { workspaceId },
-        _sum: { roiScore: true },
+      // Get top 5 opportunities sorted by ROI and impact
+      const sortedOpportunities = [...opportunities].sort((a: any, b: any) => {
+        const aRoi = a.roiScore ?? 0
+        const bRoi = b.roiScore ?? 0
+        if (aRoi !== bRoi) return bRoi - aRoi
+        const aImpact = a.impactScore ?? 0
+        const bImpact = b.impactScore ?? 0
+        return bImpact - aImpact
       })
-      const roiSum = savingsResult._sum.roiScore ?? 0
+      
+      const top5 = sortedOpportunities.slice(0, 5)
+      
+      // Get workflow data for each opportunity
+      topOpportunities = await Promise.all(
+        top5.map(async (opp: any) => {
+          let workflow = null
+          if (opp.workflowId) {
+            const wf = await findUnique("workflows", opp.workflowId)
+            workflow = wf ? { name: wf.name } : null
+          }
+          return {
+            id: opp.id,
+            title: opp.title,
+            type: opp.type,
+            impactScore: opp.impactScore ?? null,
+            roiScore: opp.roiScore ?? null,
+            workflow,
+          }
+        })
+      )
+
+      // Calculate estimated savings from ROI scores
+      const roiSum = opportunities.reduce((sum: number, opp: any) => {
+        return sum + (opp.roiScore ?? 0)
+      }, 0)
       estimatedSavings = Math.round(roiSum * 100)
     }
   } catch (err) {
@@ -94,10 +125,7 @@ export default async function DashboardPage() {
                 Add Workflow
               </Button>
             </Link>
-            <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700">
-              <PlayIcon className="mr-1 h-4 w-4" />
-              Run Analysis
-            </Button>
+            <RunAnalysisButton workspaceId={activeWorkspaceId ?? ""} />
             <Button variant="outline" size="sm">
               <FileDownIcon className="mr-1 h-4 w-4" />
               Export Report

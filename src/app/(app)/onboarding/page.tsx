@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useState, useTransition, useRef } from "react"
 import { PageHeader } from "@/components/page-header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -133,6 +133,7 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(1)
   const [data, setData] = useState<OnboardingData>(initialData)
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   function updateData(partial: Partial<OnboardingData>) {
     setData((prev) => ({ ...prev, ...partial }))
@@ -277,8 +278,8 @@ export default function OnboardingPage() {
                 <div className="grid gap-2">
                   <Label>Industry</Label>
                   <Select
-                    value={data.industry}
-                    onValueChange={(v) => updateData({ industry: v })}
+                    value={data.industry || ""}
+                    onValueChange={(v) => updateData({ industry: v || "" })}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select industry" />
@@ -420,7 +421,7 @@ export default function OnboardingPage() {
                       />
                       <Select
                         value={tool.category}
-                        onValueChange={(v) => updateTool(i, "category", v)}
+                        onValueChange={(v) => updateTool(i, "category", v || "")}
                       >
                         <SelectTrigger className="w-36">
                           <SelectValue placeholder="Category" />

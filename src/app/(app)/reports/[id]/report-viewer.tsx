@@ -3,7 +3,7 @@
 import { useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { DownloadIcon } from "lucide-react"
-import type { Report } from "@prisma/client"
+import type { Report } from "@/types"
 
 type ReportWithContent = Report & { content: unknown }
 
@@ -18,7 +18,10 @@ export function ReportViewer({
   const html = content?.html ?? ""
 
   const typeLabel = report.type.replace(/_/g, " ")
-  const filename = `report-${typeLabel.toLowerCase().replace(/\s+/g, "-")}-${new Date(report.generatedAt).toISOString().slice(0, 10)}.txt`
+  const generatedAt = report.generatedAt instanceof Date 
+    ? report.generatedAt 
+    : (report.generatedAt as any)?.toDate?.() || new Date(report.generatedAt as any)
+  const filename = `report-${typeLabel.toLowerCase().replace(/\s+/g, "-")}-${generatedAt.toISOString().slice(0, 10)}.txt`
 
   const handleDownload = useCallback(() => {
     const text = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()

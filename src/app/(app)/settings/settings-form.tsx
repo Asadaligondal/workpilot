@@ -50,7 +50,7 @@ export function SettingsForm({
       </div>
       <div className="grid gap-2">
         <Label>Industry</Label>
-        <Select value={formIndustry} onValueChange={setFormIndustry}>
+        <Select value={formIndustry} onValueChange={(v) => setFormIndustry(v || "")}>
           <SelectTrigger className="w-64">
             <SelectValue placeholder="Select industry" />
           </SelectTrigger>

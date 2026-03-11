@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Bell, CheckCheck } from "lucide-react"
 import { markAllRead } from "@/app/(app)/notifications/actions"
-import type { Notification } from "@prisma/client"
+import type { Notification } from "@/types/notification"
 
 interface NotificationBellProps {
   unreadCount: number
@@ -57,35 +57,32 @@ export function NotificationBell({
             </div>
           ) : (
             recentNotifications.map((n) => (
-              <DropdownMenuItem key={n.id} asChild>
-                <Link
-                  href="/notifications"
-                  className="flex flex-col items-start gap-0.5 px-2 py-2"
-                >
-                  <span className="font-medium">{n.title}</span>
-                  {n.message && (
-                    <span className="line-clamp-2 text-xs text-muted-foreground">
-                      {n.message}
-                    </span>
-                  )}
-                  <span className="text-[10px] text-muted-foreground">
-                    {new Date(n.createdAt).toLocaleString(undefined, {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                    })}
+              <DropdownMenuItem
+                key={n.id}
+                render={<Link href="/notifications" />}
+                className="flex flex-col items-start gap-0.5 px-2 py-2"
+              >
+                <span className="font-medium">{n.title}</span>
+                {n.message && (
+                  <span className="line-clamp-2 text-xs text-muted-foreground">
+                    {n.message}
                   </span>
-                </Link>
+                )}
+                <span className="text-[10px] text-muted-foreground">
+                  {new Date(n.createdAt as any).toLocaleString(undefined, {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  })}
+                </span>
               </DropdownMenuItem>
             ))
           )}
         </div>
-        <DropdownMenuItem asChild>
-          <Link
-            href="/notifications"
-            className="justify-center border-t py-2 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700 dark:text-indigo-400 dark:hover:bg-indigo-950/50 dark:hover:text-indigo-300"
-          >
-            View all notifications
-          </Link>
+        <DropdownMenuItem
+          render={<Link href="/notifications" />}
+          className="justify-center border-t py-2 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700 dark:text-indigo-400 dark:hover:bg-indigo-950/50 dark:hover:text-indigo-300"
+        >
+          View all notifications
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

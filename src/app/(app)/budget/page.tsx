@@ -27,7 +27,7 @@ export default async function BudgetPage() {
 
   const displayEstimates =
     estimates.length > 0
-      ? estimates.map((e) => ({
+      ? estimates.map((e: any) => ({
           id: e.id,
           category: e.category,
           itemName: e.itemName,
@@ -37,7 +37,7 @@ export default async function BudgetPage() {
         }))
       : buildMockEstimates(opportunities.length)
 
-  const displayOpportunities = opportunities.map((o) => ({
+  const displayOpportunities = opportunities.map((o: any) => ({
     id: o.id,
     title: o.title,
     roiScore: o.roiScore,

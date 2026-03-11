@@ -13,9 +13,7 @@ export default async function BillingPage() {
         plan: "free",
         status: "active",
         currentPeriodEnd: null,
-        stripeCustomerId: null,
       }
-  const hasStripeCustomer = !!subscription.stripeCustomerId
 
   return (
     <>
@@ -27,10 +25,7 @@ export default async function BillingPage() {
         {!result.ok && (
           <p className="mb-4 text-sm text-amber-600">{result.error}</p>
         )}
-        <BillingClient
-          subscription={subscription}
-          hasStripeCustomer={hasStripeCustomer}
-        />
+        <BillingClient subscription={subscription} />
       </div>
     </>
   )

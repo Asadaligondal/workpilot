@@ -2,16 +2,20 @@ import { PageHeader } from "@/components/page-header"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { getActiveWorkspaceId } from "@/lib/workspace"
-import { prisma } from "@/lib/prisma"
+import { findFirst, findMany, where, orderBy } from "@/lib/firestore-helpers"
 import { CompanyForm } from "./company-form"
 import { OrgStructure } from "./org-structure"
 import { ToolStack } from "./tool-stack"
 import { ConstraintsForm } from "./constraints-form"
 
+export const dynamic = "force-dynamic"
+
 async function getBusinessProfileData() {
   try {
     const workspaceId = await getActiveWorkspaceId()
+    console.log("[BP] Loading business profile for workspaceId:", workspaceId)
     if (!workspaceId) {
+      console.log("[BP] No workspaceId found in cookie!")
       return {
         profile: null,
         departments: [],
@@ -21,19 +25,27 @@ async function getBusinessProfileData() {
     }
 
     const [profile, departments, toolStackItems] = await Promise.all([
-      prisma.businessProfile.findUnique({
-        where: { workspaceId },
-      }),
-      prisma.department.findMany({
-        where: { workspaceId },
-        include: { roles: true },
-        orderBy: { name: "asc" },
-      }),
-      prisma.toolStackItem.findMany({
-        where: { workspaceId },
-        orderBy: { name: "asc" },
-      }),
+      findFirst("businessProfiles", [where("workspaceId", "==", workspaceId)]),
+      findMany("departments", [
+        where("workspaceId", "==", workspaceId),
+        orderBy("name", "asc"),
+      ]),
+      findMany("toolStackItems", [
+        where("workspaceId", "==", workspaceId),
+        orderBy("name", "asc"),
+      ]),
     ])
+    console.log("[BP] Profile found:", profile ? JSON.stringify({ id: profile.id, companyName: profile.companyName, workspaceId: profile.workspaceId }) : "NULL")
+
+    // Get roles for each department
+    const departmentsWithRoles = await Promise.all(
+      departments.map(async (dept: any) => {
+        const roles = await findMany("teamRoles", [
+          where("departmentId", "==", dept.id),
+        ])
+        return { ...dept, roles }
+      })
+    )
 
     const locations =
       profile?.locations != null
@@ -67,12 +79,12 @@ async function getBusinessProfileData() {
             locations,
           }
         : null,
-      departments: departments.map((d) => ({
+      departments: departmentsWithRoles.map((d: any) => ({
         id: d.id,
         name: d.name,
         headCount: d.headCount,
         manager: d.manager ?? "",
-        roles: d.roles.map((r) => ({
+        roles: d.roles.map((r: any) => ({
           id: r.id,
           title: r.title,
           responsibilities: r.responsibilities ?? "",
@@ -83,7 +95,7 @@ async function getBusinessProfileData() {
               : "",
         })),
       })),
-      toolStackItems: toolStackItems.map((t) => ({
+      toolStackItems: toolStackItems.map((t: any) => ({
         id: t.id,
         name: t.name,
         category: t.category ?? "",
@@ -111,6 +123,7 @@ async function getBusinessProfileData() {
 }
 
 export default async function BusinessProfilePage() {
+  const workspaceId = await getActiveWorkspaceId()
   const data = await getBusinessProfileData()
 
   return (
@@ -137,7 +150,7 @@ export default async function BusinessProfilePage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <CompanyForm initialData={data.profile ?? undefined} />
+                <CompanyForm key={workspaceId} initialData={data.profile ?? undefined} />
               </CardContent>
             </Card>
           </TabsContent>
@@ -151,7 +164,7 @@ export default async function BusinessProfilePage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <OrgStructure initialDepartments={data.departments} />
+                <OrgStructure key={workspaceId} initialDepartments={data.departments} />
               </CardContent>
             </Card>
           </TabsContent>
@@ -165,7 +178,7 @@ export default async function BusinessProfilePage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <ToolStack initialItems={data.toolStackItems} />
+                <ToolStack key={workspaceId} initialItems={data.toolStackItems} />
               </CardContent>
             </Card>
           </TabsContent>
@@ -179,7 +192,7 @@ export default async function BusinessProfilePage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <ConstraintsForm initialData={data.constraints ?? undefined} />
+                <ConstraintsForm key={workspaceId} initialData={data.constraints ?? undefined} />
               </CardContent>
             </Card>
           </TabsContent>

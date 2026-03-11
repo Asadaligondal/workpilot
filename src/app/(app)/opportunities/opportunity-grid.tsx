@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
-import type { OpportunityType } from "@prisma/client"
+import type { OpportunityType } from "@/types"
 
 type OpportunityWithWorkflow = {
   id: string

@@ -106,8 +106,8 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
         <div className="space-y-2">
           <Label htmlFor="industry">Industry</Label>
           <Select
-            value={form.industry || undefined}
-            onValueChange={(v) => setForm((f) => ({ ...f, industry: v }))}
+            value={form.industry}
+            onValueChange={(v) => setForm((f) => ({ ...f, industry: v || "" }))}
           >
             <SelectTrigger id="industry" className="w-full">
               <SelectValue placeholder="Select industry" />
@@ -136,8 +136,8 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
         <div className="space-y-2">
           <Label htmlFor="teamSize">Team Size</Label>
           <Select
-            value={form.teamSize || undefined}
-            onValueChange={(v) => setForm((f) => ({ ...f, teamSize: v }))}
+            value={form.teamSize}
+            onValueChange={(v) => setForm((f) => ({ ...f, teamSize: v || "" }))}
           >
             <SelectTrigger id="teamSize" className="w-full">
               <SelectValue placeholder="Select team size" />
@@ -154,8 +154,8 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
         <div className="space-y-2">
           <Label htmlFor="growthStage">Growth Stage</Label>
           <Select
-            value={form.growthStage || undefined}
-            onValueChange={(v) => setForm((f) => ({ ...f, growthStage: v }))}
+            value={form.growthStage}
+            onValueChange={(v) => setForm((f) => ({ ...f, growthStage: v || "" }))}
           >
             <SelectTrigger id="growthStage" className="w-full">
               <SelectValue placeholder="Select growth stage" />

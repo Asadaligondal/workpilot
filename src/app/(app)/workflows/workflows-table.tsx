@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import type { WorkflowStatus } from "@prisma/client"
+import type { WorkflowStatus } from "@/types"
 
 type WorkflowWithMeta = {
   id: string
@@ -84,7 +84,7 @@ export function WorkflowsTable({ workflows }: { workflows: WorkflowWithMeta[] })
       <div className="flex gap-2">
         <Select
           value={departmentFilter}
-          onValueChange={setDepartmentFilter}
+          onValueChange={(v) => setDepartmentFilter(v || "")}
         >
           <SelectTrigger className="w-48">
             <SelectValue placeholder="Department" />
@@ -98,7 +98,7 @@ export function WorkflowsTable({ workflows }: { workflows: WorkflowWithMeta[] })
             ))}
           </SelectContent>
         </Select>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v || "")}>
           <SelectTrigger className="w-40">
             <SelectValue placeholder="Status" />
           </SelectTrigger>

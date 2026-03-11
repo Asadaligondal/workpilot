@@ -1,22 +1,12 @@
-import { getActiveWorkspaceId } from "@/lib/workspace"
-import { prisma } from "@/lib/prisma"
 import { PageHeader } from "@/components/page-header"
 import { NotificationsList } from "./notifications-list"
 import { Button } from "@/components/ui/button"
-import { markAllRead } from "./actions"
+import { markAllRead, getNotifications } from "./actions"
 import { CheckCheck } from "lucide-react"
 
 export default async function NotificationsPage() {
-  const workspaceId = await getActiveWorkspaceId()
-
-  const notifications = workspaceId
-    ? await prisma.notification.findMany({
-        where: { workspaceId },
-        orderBy: { createdAt: "desc" },
-      })
-    : []
-
-  const unreadCount = notifications.filter((n) => !n.isRead).length
+  const notifications = await getNotifications() as any[]
+  const unreadCount = notifications.filter((n: any) => !n.isRead).length
 
   return (
     <div className="flex flex-1 flex-col">

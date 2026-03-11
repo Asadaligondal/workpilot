@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation"
 import { PageHeader } from "@/components/page-header"
-import { Badge } from "@/components/ui/badge"
 import { getWorkflow } from "./actions"
 import { WorkflowDetailClient } from "./workflow-detail-client"
 import { WorkflowActionsDropdown } from "./workflow-actions"
+import { getActiveWorkspaceId } from "@/lib/workspace"
 
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: "Draft",
@@ -17,14 +17,14 @@ const STATUS_VARIANTS: Record<string, "default" | "secondary" | "destructive" | 
   APPROVED: "outline",
 }
 
-function serializeWorkflow(workflow: Awaited<ReturnType<typeof getWorkflow>>) {
+function serializeWorkflow(workflow: any) {
   if (!workflow) return null
   return {
     ...workflow,
     createdAt:
       workflow.createdAt instanceof Date
         ? workflow.createdAt.toISOString()
-        : String(workflow.createdAt),
+        : workflow.createdAt?.toDate?.()?.toISOString?.() || String(workflow.createdAt ?? ""),
   }
 }
 
@@ -34,7 +34,8 @@ export default async function WorkflowDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const workflow = await getWorkflow(id)
+  const workspaceId = await getActiveWorkspaceId()
+  const workflow = await getWorkflow(id) as any
 
   if (!workflow) {
     notFound()
@@ -50,10 +51,12 @@ export default async function WorkflowDetailPage({
         title={workflow.name}
         description={workflow.description ?? undefined}
         actions={
-          <div className="flex items-center gap-2">
-            <WorkflowActionsDropdown workflowId={id} statusVariant={statusVariant} statusLabel={statusLabel} />
-            <Badge variant={statusVariant}>{statusLabel}</Badge>
-          </div>
+          <WorkflowActionsDropdown
+            workflowId={id}
+            workspaceId={workspaceId ?? ""}
+            statusVariant={statusVariant}
+            statusLabel={statusLabel}
+          />
         }
       />
       <div className="flex-1 p-6">

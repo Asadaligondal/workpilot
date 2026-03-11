@@ -1,6 +1,6 @@
 import { PageHeader } from "@/components/page-header"
 import { EmptyState } from "@/components/empty-state"
-import { GenerateReportDialog, ReportsList } from "./reports-client"
+import { GenerateReportDialog, ReportsClient } from "./reports-client"
 import { getReports } from "./actions"
 import { FileTextIcon } from "lucide-react"
 
@@ -28,7 +28,7 @@ export default async function ReportsPage() {
             action={<GenerateReportDialog />}
           />
         ) : (
-          <ReportsList reports={reports} />
+          <ReportsClient reports={reports as any} />
         )}
       </div>
     </>

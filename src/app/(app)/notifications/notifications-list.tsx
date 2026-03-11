@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { Bell, Check } from "lucide-react"
-import type { Notification } from "@prisma/client"
+import type { Notification } from "@/types/notification"
 
 interface NotificationsListProps {
   notifications: Notification[]
@@ -56,10 +56,15 @@ export function NotificationsList({ notifications }: NotificationsListProps) {
               </p>
             )}
             <p className="mt-1 text-xs text-muted-foreground">
-              {new Date(notification.createdAt).toLocaleDateString(undefined, {
-                dateStyle: "medium",
-                timeStyle: "short",
-              })}
+              {(() => {
+                const createdAt = notification.createdAt instanceof Date 
+                  ? notification.createdAt 
+                  : (notification.createdAt as any)?.toDate?.() || new Date(notification.createdAt as any)
+                return createdAt.toLocaleString(undefined, {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                })
+              })()}
             </p>
           </div>
           {!notification.isRead && (

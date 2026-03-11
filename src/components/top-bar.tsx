@@ -5,7 +5,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Input } from "@/components/ui/input"
 import { NotificationBell } from "@/components/notification-bell"
 import { SearchIcon } from "lucide-react"
-import type { Notification } from "@prisma/client"
+import type { Notification } from "@/types/notification"
 
 interface TopBarProps {
   unreadCount?: number

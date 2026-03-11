@@ -1,25 +1,38 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server"
+import { NextResponse } from "next/server"
+import type { NextRequest } from "next/server"
 
-const isPublicRoute = createRouteMatcher([
-  "/",
-  "/features(.*)",
-  "/solutions(.*)",
-  "/pricing(.*)",
-  "/sample-reports(.*)",
-  "/about(.*)",
-  "/contact(.*)",
-  "/blog(.*)",
-  "/legal(.*)",
-  "/sign-in(.*)",
-  "/sign-up(.*)",
-  "/api/webhooks(.*)",
-])
+const exactPublicRoutes = new Set(["/"])
 
-export default clerkMiddleware(async (auth, request) => {
-  if (!isPublicRoute(request)) {
-    await auth.protect()
+const prefixPublicRoutes = [
+  "/features",
+  "/solutions",
+  "/pricing",
+  "/sample-reports",
+  "/about",
+  "/contact",
+  "/blog",
+  "/legal",
+  "/sign-in",
+  "/sign-up",
+  "/api/auth",
+]
+
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl
+  const token = request.cookies.get("firebase-auth-token")?.value
+
+  const isPublicRoute =
+    exactPublicRoutes.has(pathname) ||
+    prefixPublicRoutes.some((route) => pathname.startsWith(route))
+
+  if (!isPublicRoute && !token) {
+    const signInUrl = new URL("/sign-in", request.url)
+    signInUrl.searchParams.set("redirect", pathname)
+    return NextResponse.redirect(signInUrl)
   }
-})
+
+  return NextResponse.next()
+}
 
 export const config = {
   matcher: [

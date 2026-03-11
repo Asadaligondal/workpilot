@@ -1,19 +1,24 @@
 "use server"
 
-import { prisma } from "@/lib/prisma"
 import { getActiveWorkspaceId } from "@/lib/workspace"
 import { revalidatePath } from "next/cache"
+import { findMany, findFirst, findUnique, where, create, update, toPlain } from "@/lib/firestore-helpers"
+import { db } from "@/lib/firebase"
 
 export async function getProposals() {
   try {
     const workspaceId = await getActiveWorkspaceId()
     if (!workspaceId) return []
 
-    const proposals = await prisma.proposal.findMany({
-      where: { workspaceId },
-      orderBy: { createdAt: "desc" },
+    const proposals = await findMany("proposals", [
+      where("workspaceId", "==", workspaceId),
+    ])
+    proposals.sort((a: any, b: any) => {
+      const aTime = a.createdAt?._seconds ?? a.createdAt?.seconds ?? 0
+      const bTime = b.createdAt?._seconds ?? b.createdAt?.seconds ?? 0
+      return bTime - aTime
     })
-    return proposals
+    return toPlain(proposals)
   } catch (err) {
     console.error("getProposals:", err)
     return []
@@ -82,7 +87,7 @@ function buildProposalContent(
     (sum, r) =>
       sum +
       (r.phases?.reduce(
-        (s, p) => s + 1,
+        (s) => s + 1,
         0 as number
       ) ?? 4),
     0
@@ -116,21 +121,24 @@ export async function generateProposal(
   try {
     const workspaceId = await getActiveWorkspaceId()
     if (!workspaceId) return { success: false, error: "No active workspace" }
-    const [workspace, businessProfile, opportunities, roadmaps, budgetEstimates] =
+
+    const [workspaceDoc, businessProfile, opportunities, roadmaps, budgetEstimates] =
       await Promise.all([
-        prisma.workspace.findUnique({
-          where: { id: workspaceId },
-          select: { name: true },
-        }),
-        prisma.businessProfile.findFirst({ where: { workspaceId } }),
-        prisma.opportunity.findMany({ where: { workspaceId } }),
-        prisma.roadmap.findMany({
-          where: { workspaceId },
-          include: { phases: true },
-        }),
-        prisma.budgetEstimate.findMany({ where: { workspaceId } }),
+        db.collection("workspaces").doc(workspaceId).get(),
+        findFirst("businessProfiles", [where("workspaceId", "==", workspaceId)]),
+        findMany("opportunities", [where("workspaceId", "==", workspaceId)]),
+        findMany("roadmaps", [where("workspaceId", "==", workspaceId)]),
+        findMany("budgetEstimates", [where("workspaceId", "==", workspaceId)]),
       ])
 
+    const roadmapsWithPhases = await Promise.all(
+      roadmaps.map(async (rm: any) => {
+        const phases = await findMany("roadmapPhases", [where("roadmapId", "==", rm.id)])
+        return { ...rm, phases }
+      })
+    )
+
+    const workspace = workspaceDoc.exists ? workspaceDoc.data() : null
     const companyName =
       workspace?.name || businessProfile?.companyName || "Company"
 
@@ -138,21 +146,19 @@ export async function generateProposal(
       companyName,
       clientName: clientName || "Client",
       template: template || "consulting",
-      opportunities,
-      roadmaps,
-      budgetEstimates,
+      opportunities: opportunities as any,
+      roadmaps: roadmapsWithPhases as any,
+      budgetEstimates: budgetEstimates as any,
     })
 
-    const proposal = await prisma.proposal.create({
-      data: {
-        workspaceId,
-        title: `Proposal for ${clientName || "Client"}`,
-        clientName: clientName || null,
-        content: {
-          markdown: content,
-          template,
-        } as object,
-      },
+    const proposal = await create("proposals", {
+      workspaceId,
+      title: `Proposal for ${clientName || "Client"}`,
+      clientName: clientName || null,
+      content: {
+        markdown: content,
+        template,
+      } as object,
     })
 
     revalidatePath("/proposals")
@@ -168,20 +174,16 @@ export async function updateProposalContent(id: string, content: string) {
     const workspaceId = await getActiveWorkspaceId()
     if (!workspaceId) return { success: false, error: "No active workspace" }
 
-    const existing = await prisma.proposal.findFirst({
-      where: { id, workspaceId },
-    })
-    if (!existing) return { success: false, error: "Proposal not found" }
+    const existing = await findUnique("proposals", id)
+    if (!existing || existing.workspaceId !== workspaceId)
+      return { success: false, error: "Proposal not found" }
 
     const currentContent = (existing.content as { markdown?: string }) ?? {}
-    await prisma.proposal.update({
-      where: { id },
-      data: {
-        content: {
-          ...currentContent,
-          markdown: content,
-        } as object,
-      },
+    await update("proposals", id, {
+      content: {
+        ...currentContent,
+        markdown: content,
+      } as object,
     })
 
     revalidatePath("/proposals")

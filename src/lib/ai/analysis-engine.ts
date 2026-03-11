@@ -201,19 +201,34 @@ export async function runAnalysisPipeline(workspaceId: string): Promise<Analysis
 
   const client = getOpenAIClient()
 
-  const { prisma } = await import("@/lib/prisma")
+  const { findFirst, findMany, findUnique, where } = await import("@/lib/firestore-helpers")
 
   const [businessProfile, workflows] = await Promise.all([
-    prisma.businessProfile.findUnique({ where: { workspaceId } }),
-    prisma.workflow.findMany({
-      where: { workspaceId },
-      include: {
-        steps: { orderBy: { order: "asc" }, include: { actorRole: true } },
-        painPoints: true,
-        department: true,
-      },
-    }),
+    findFirst("businessProfiles", [where("workspaceId", "==", workspaceId)]),
+    findMany("workflows", [where("workspaceId", "==", workspaceId)]),
   ])
+
+  const workflowsWithData = await Promise.all(
+    workflows.map(async (wf: any) => {
+      const steps = await findMany("workflowSteps", [
+        where("workflowId", "==", wf.id),
+      ])
+      steps.sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0))
+      const stepsWithRoles = await Promise.all(
+        steps.map(async (step: any) => {
+          const actorRole = step.actorRoleId
+            ? await findUnique("teamRoles", step.actorRoleId)
+            : null
+          return { ...step, actorRole }
+        })
+      )
+      const painPoints = await findMany("painPoints", [where("workflowId", "==", wf.id)])
+      const department = wf.departmentId
+        ? await findUnique("departments", wf.departmentId)
+        : null
+      return { ...wf, steps: stepsWithRoles, painPoints, department }
+    })
+  )
 
   const input: PipelineInput = {
     businessProfile: businessProfile
@@ -228,14 +243,14 @@ export async function runAnalysisPipeline(workspaceId: string): Promise<Analysis
           constraints: businessProfile.constraints as Record<string, string> | undefined,
         }
       : null,
-    workflows: workflows.map((w) => ({
+    workflows: workflowsWithData.map((w: any) => ({
       id: w.id,
       name: w.name,
       description: w.description,
       trigger: w.trigger,
       frequency: w.frequency,
       departmentName: w.department?.name,
-      steps: w.steps.map((s) => ({
+      steps: w.steps.map((s: any) => ({
         id: s.id,
         name: s.name,
         description: s.description,
@@ -245,7 +260,7 @@ export async function runAnalysisPipeline(workspaceId: string): Promise<Analysis
         isManual: s.isManual,
         isBottleneck: s.isBottleneck,
       })),
-      painPoints: w.painPoints.map((p) => ({
+      painPoints: w.painPoints.map((p: any) => ({
         type: p.type,
         severity: p.severity,
         description: p.description,
@@ -414,9 +429,9 @@ export async function runAnalysisPipeline(workspaceId: string): Promise<Analysis
     })
 
     const budgetRanges = {
-      low: stageFParsed.budgetRanges.low ?? stageFParsed.budgetRanges.quickWins ?? "$5K-15K",
-      mid: stageFParsed.budgetRanges.medium ?? stageFParsed.budgetRanges.strategic ?? "$15K-50K",
-      high: stageFParsed.budgetRanges.high ?? stageFParsed.budgetRanges.optional ?? "$50K+",
+      low: stageFParsed.budgetRanges.low ?? (stageFParsed.budgetRanges as any).quickWins ?? "$5K-15K",
+      mid: stageFParsed.budgetRanges.medium ?? (stageFParsed.budgetRanges as any).strategic ?? "$15K-50K",
+      high: stageFParsed.budgetRanges.high ?? (stageFParsed.budgetRanges as any).optional ?? "$50K+",
     }
 
     return {

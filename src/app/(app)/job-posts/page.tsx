@@ -5,9 +5,9 @@ import { getJobPosts } from "./actions"
 import { BriefcaseIcon } from "lucide-react"
 
 export default async function JobPostsPage() {
-  let jobPosts: Awaited<ReturnType<typeof getJobPosts>> = []
+  let jobPosts: any[] = []
   try {
-    jobPosts = await getJobPosts()
+    jobPosts = await getJobPosts() as any[]
   } catch {
     jobPosts = []
   }

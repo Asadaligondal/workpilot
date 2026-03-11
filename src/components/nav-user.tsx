@@ -26,22 +26,40 @@ import {
   CreditCardIcon,
   LogOutIcon,
 } from "lucide-react"
-import { useUser, useClerk } from "@clerk/nextjs"
+import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
+import { auth as firebaseAuth } from "@/lib/firebase-client"
+import { onAuthStateChanged, User } from "firebase/auth"
 
 export function NavUser() {
   const { isMobile } = useSidebar()
-  const { user } = useUser()
-  const { signOut } = useClerk()
+  const router = useRouter()
+  const [user, setUser] = useState<User | null>(null)
 
-  const name = user?.fullName ?? user?.firstName ?? "User"
-  const email = user?.primaryEmailAddress?.emailAddress ?? ""
-  const avatarUrl = user?.imageUrl
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
+      setUser(user)
+    })
+    return unsubscribe
+  }, [])
+
+  const handleSignOut = async () => {
+    await fetch("/api/auth/session", { method: "DELETE" })
+    await firebaseAuth.signOut()
+    router.push("/")
+  }
+
+  const name = user?.displayName || user?.email?.split("@")[0] || "User"
+  const email = user?.email || ""
+  const avatarUrl = user?.photoURL || undefined
   const initials = name
     .split(" ")
     .map((n) => n[0])
     .join("")
     .toUpperCase()
     .slice(0, 2)
+
+  if (!user) return null
 
   return (
     <SidebarMenu>
@@ -51,7 +69,7 @@ export function NavUser() {
             render={
               <SidebarMenuButton
                 size="lg"
-                className="aria-expanded:bg-muted"
+                className="data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground w-full"
               />
             }
           >
@@ -99,13 +117,13 @@ export function NavUser() {
                 <BadgeCheckIcon />
                 Account
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push("/billing")}>
                 <CreditCardIcon />
                 Billing
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => signOut({ redirectUrl: "/" })}>
+            <DropdownMenuItem onClick={handleSignOut}>
               <LogOutIcon />
               Log out
             </DropdownMenuItem>

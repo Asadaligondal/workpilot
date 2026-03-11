@@ -1,17 +1,18 @@
 "use server"
 
-import { prisma } from "@/lib/prisma"
 import { getActiveWorkspaceId } from "@/lib/workspace"
 import { revalidatePath } from "next/cache"
+import { findFirst, findMany, where, upsert, update } from "@/lib/firestore-helpers"
+import { db } from "@/lib/firebase"
 
 export async function getScope() {
   try {
     const workspaceId = await getActiveWorkspaceId()
     if (!workspaceId) return null
 
-    const scope = await prisma.scope.findUnique({
-      where: { workspaceId },
-    })
+    const scope = await findFirst("scopes", [
+      where("workspaceId", "==", workspaceId),
+    ])
     return scope
   } catch (err) {
     console.error("getScope:", err)
@@ -113,44 +114,53 @@ export async function generateScope() {
   try {
     const workspaceId = await getActiveWorkspaceId()
     if (!workspaceId) return { success: false, error: "No active workspace" }
-    const [workspace, businessProfile, opportunities, roadmaps, workflows] =
+    
+    const [workspaceDoc, businessProfile, opportunities, roadmaps, workflows] =
       await Promise.all([
-        prisma.workspace.findUnique({
-          where: { id: workspaceId },
-          select: { name: true },
-        }),
-        prisma.businessProfile.findFirst({ where: { workspaceId } }),
-        prisma.opportunity.findMany({ where: { workspaceId } }),
-        prisma.roadmap.findMany({
-          where: { workspaceId },
-          include: { phases: { include: { items: true } } },
-        }),
-        prisma.workflow.findMany({ where: { workspaceId } }),
+        db.collection("workspaces").doc(workspaceId).get(),
+        findFirst("businessProfiles", [where("workspaceId", "==", workspaceId)]),
+        findMany("opportunities", [where("workspaceId", "==", workspaceId)]),
+        findMany("roadmaps", [where("workspaceId", "==", workspaceId)]),
+        findMany("workflows", [where("workspaceId", "==", workspaceId)]),
       ])
 
+    // Get roadmap phases and items
+    const roadmapsWithPhases = await Promise.all(
+      roadmaps.map(async (rm: any) => {
+        const phases = await findMany("roadmapPhases", [where("roadmapId", "==", rm.id)])
+        const phasesWithItems = await Promise.all(
+          phases.map(async (phase: any) => {
+            const items = await findMany("roadmapItems", [where("phaseId", "==", phase.id)])
+            return { ...phase, items }
+          })
+        )
+        return { ...rm, phases: phasesWithItems }
+      })
+    )
+
+    const workspace = workspaceDoc.exists ? workspaceDoc.data() : null
     const companyName =
       workspace?.name || businessProfile?.companyName || "Company"
 
     const content = buildScopeContent({
       companyName,
-      opportunities,
-      roadmaps,
-      workflows,
+      opportunities: opportunities as any,
+      roadmaps: roadmapsWithPhases as any,
+      workflows: workflows as any,
     })
 
-    const scope = await prisma.scope.upsert({
-      where: { workspaceId },
-      create: {
+    await upsert(
+      "scopes",
+      "workspaceId",
+      workspaceId,
+      {
         workspaceId,
         content: content as object,
-      },
-      update: {
-        content: content as object,
-      },
-    })
+      }
+    )
 
     revalidatePath("/scope")
-    return { success: true, id: scope.id }
+    return { success: true }
   } catch (err) {
     console.error("generateScope:", err)
     return { success: false, error: String(err) }
@@ -161,34 +171,46 @@ export async function generateTaskBreakdown() {
   try {
     const workspaceId = await getActiveWorkspaceId()
     if (!workspaceId) return { success: false, error: "No active workspace" }
+    
     const [opportunities, roadmaps, scope] = await Promise.all([
-      prisma.opportunity.findMany({ where: { workspaceId } }),
-      prisma.roadmap.findMany({
-        where: { workspaceId },
-        include: { phases: { include: { items: true } } },
-      }),
-      prisma.scope.findUnique({ where: { workspaceId } }),
+      findMany("opportunities", [where("workspaceId", "==", workspaceId)]),
+      findMany("roadmaps", [where("workspaceId", "==", workspaceId)]),
+      findFirst("scopes", [where("workspaceId", "==", workspaceId)]),
     ])
 
+    // Get roadmap phases and items
+    const roadmapsWithPhases = await Promise.all(
+      roadmaps.map(async (rm: any) => {
+        const phases = await findMany("roadmapPhases", [where("roadmapId", "==", rm.id)])
+        const phasesWithItems = await Promise.all(
+          phases.map(async (phase: any) => {
+            const items = await findMany("roadmapItems", [where("phaseId", "==", phase.id)])
+            return { ...phase, items }
+          })
+        )
+        return { ...rm, phases: phasesWithItems }
+      })
+    )
+
     const taskBreakdown = buildTaskBreakdown({
-      opportunities,
-      roadmaps,
+      opportunities: opportunities as any,
+      roadmaps: roadmapsWithPhases as any,
     })
 
     if (scope) {
-      await prisma.scope.update({
-        where: { id: scope.id },
-        data: {
-          taskBreakdown: taskBreakdown as object,
-        },
+      await update("scopes", scope.id, {
+        taskBreakdown: taskBreakdown as object,
       })
     } else {
-      await prisma.scope.create({
-        data: {
+      await upsert(
+        "scopes",
+        "workspaceId",
+        workspaceId,
+        {
           workspaceId,
           taskBreakdown: taskBreakdown as object,
-        },
-      })
+        }
+      )
     }
 
     revalidatePath("/scope")
@@ -204,15 +226,12 @@ export async function updateScopeContent(content: Record<string, string>) {
     const workspaceId = await getActiveWorkspaceId()
     if (!workspaceId) return { success: false, error: "No active workspace" }
 
-    const scope = await prisma.scope.findUnique({
-      where: { workspaceId },
-    })
+    const scope = await findFirst("scopes", [
+      where("workspaceId", "==", workspaceId),
+    ])
     if (!scope) return { success: false, error: "No scope document" }
 
-    await prisma.scope.update({
-      where: { id: scope.id },
-      data: { content: content as object },
-    })
+    await update("scopes", scope.id, { content: content as object })
 
     revalidatePath("/scope")
     return { success: true }

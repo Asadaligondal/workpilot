@@ -1,9 +1,32 @@
+"use client"
+
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { BoltIcon } from "lucide-react"
-import { Show } from "@clerk/nextjs"
+import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
+import { auth as firebaseAuth } from "@/lib/firebase-client"
+import { onAuthStateChanged } from "firebase/auth"
 
 function MarketingHeader() {
+  const router = useRouter()
+  const [isSignedIn, setIsSignedIn] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
+      setIsSignedIn(!!user)
+      setLoading(false)
+    })
+    return unsubscribe
+  }, [])
+
+  const handleSignOut = async () => {
+    await fetch("/api/auth/session", { method: "DELETE" })
+    await firebaseAuth.signOut()
+    router.push("/")
+  }
+
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -40,27 +63,35 @@ function MarketingHeader() {
           </Link>
         </nav>
         <div className="flex items-center gap-3">
-          <Show
-            when="signed-out"
-            fallback={
-              <Link href="/dashboard">
-                <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700">
-                  Go to Dashboard
-                </Button>
-              </Link>
-            }
-          >
-            <Link href="/sign-in">
-              <Button variant="ghost" size="sm">
-                Log in
-              </Button>
-            </Link>
-            <Link href="/sign-up">
-              <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700">
-                Start Free Audit
-              </Button>
-            </Link>
-          </Show>
+          {!loading && (
+            <>
+              {isSignedIn ? (
+                <>
+                  <Link href="/dashboard">
+                    <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700">
+                      Go to Dashboard
+                    </Button>
+                  </Link>
+                  <Button variant="ghost" size="sm" onClick={handleSignOut}>
+                    Sign Out
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Link href="/sign-in">
+                    <Button variant="ghost" size="sm">
+                      Log in
+                    </Button>
+                  </Link>
+                  <Link href="/sign-up">
+                    <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700">
+                      Start Free Audit
+                    </Button>
+                  </Link>
+                </>
+              )}
+            </>
+          )}
         </div>
       </div>
     </header>

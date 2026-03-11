@@ -148,25 +148,30 @@ export default async function AdminPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    logs.map((log) => (
-                      <TableRow key={log.id}>
-                        <TableCell className="text-muted-foreground">
-                          {new Date(log.createdAt).toLocaleString()}
-                        </TableCell>
-                        <TableCell>{log.workspace.name}</TableCell>
-                        <TableCell>
-                          {log.user?.name ?? log.user?.email ?? "—"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="border-indigo-500/30 text-indigo-600">
-                            {log.action}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {log.entity ? `${log.entity}${log.entityId ? ` #${log.entityId.slice(-6)}` : ""}` : "—"}
-                        </TableCell>
-                      </TableRow>
-                    ))
+                    logs.map((log) => {
+                      const createdAt = log.createdAt instanceof Date 
+                        ? log.createdAt 
+                        : (log.createdAt as any)?.toDate?.() || new Date(log.createdAt as any)
+                      return (
+                        <TableRow key={log.id}>
+                          <TableCell className="text-muted-foreground">
+                            {createdAt.toLocaleString()}
+                          </TableCell>
+                          <TableCell>{log.workspace?.name ?? "—"}</TableCell>
+                          <TableCell>
+                            {log.user?.name ?? log.user?.email ?? "—"}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="border-indigo-500/30 text-indigo-600">
+                              {log.action}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {log.entity ? `${log.entity}${log.entityId ? ` #${log.entityId.slice(-6)}` : ""}` : "—"}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })
                   )}
                 </TableBody>
               </Table>

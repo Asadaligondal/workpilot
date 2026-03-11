@@ -12,7 +12,7 @@ export default async function ReportPage({
   const { id } = await params
   const { download } = await searchParams
 
-  const report = await getReport(id)
+  const report = await getReport(id) as any
   if (!report) notFound()
 
   return (

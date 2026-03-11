@@ -35,7 +35,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# prisma
 /src/generated/
 
 # uploads
@@ -47,5 +46,16 @@ next-env.d.ts
 *.swp
 *.swo
 
-# clerk configuration (can include secrets)
-/.clerk/
+# Firebase service account keys
+*-firebase-adminsdk*.json
+firebase-adminsdk*.json
+serviceAccountKey.json
+
+# Environment variables (already covered by .env)
+.env
+.env.local
+.env*.local
+
+# API keys and secrets
+**/api-keys.json
+**/secrets.json

@@ -299,21 +299,19 @@ function EpicRow({ epic }: { epic: EpicItem }) {
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger asChild>
-        <button
-          className={cn(
-            "flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition-colors hover:bg-muted",
-            open && "bg-muted/50"
-          )}
-        >
-          {open ? (
-            <ChevronDownIcon className="h-4 w-4 shrink-0" />
-          ) : (
-            <ChevronRightIcon className="h-4 w-4 shrink-0" />
-          )}
-          <Badge variant="secondary">Epic</Badge>
-          {epic.name}
-        </button>
+      <CollapsibleTrigger
+        className={cn(
+          "flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition-colors hover:bg-muted",
+          open && "bg-muted/50"
+        )}
+      >
+        {open ? (
+          <ChevronDownIcon className="h-4 w-4 shrink-0" />
+        ) : (
+          <ChevronRightIcon className="h-4 w-4 shrink-0" />
+        )}
+        <Badge variant="secondary">Epic</Badge>
+        {epic.name}
       </CollapsibleTrigger>
       <CollapsibleContent>
         <div className="ml-6 mt-2 space-y-2 border-l pl-4">
@@ -332,23 +330,21 @@ function StoryRow({ story }: { story: StoryItem }) {
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger asChild>
-        <button
-          className={cn(
-            "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted/50",
-            open && "bg-muted/30"
-          )}
-        >
-          {open ? (
-            <ChevronDownIcon className="h-3.5 w-3.5 shrink-0" />
-          ) : (
-            <ChevronRightIcon className="h-3.5 w-3.5 shrink-0" />
-          )}
-          <Badge variant="outline" className="text-xs">
-            Story
-          </Badge>
-          {story.name}
-        </button>
+      <CollapsibleTrigger
+        className={cn(
+          "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted/50",
+          open && "bg-muted/30"
+        )}
+      >
+        {open ? (
+          <ChevronDownIcon className="h-3.5 w-3.5 shrink-0" />
+        ) : (
+          <ChevronRightIcon className="h-3.5 w-3.5 shrink-0" />
+        )}
+        <Badge variant="outline" className="text-xs">
+          Story
+        </Badge>
+        {story.name}
       </CollapsibleTrigger>
       <CollapsibleContent>
         <ul className="ml-6 mt-1 space-y-1 border-l pl-4">

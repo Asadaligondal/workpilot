@@ -14,7 +14,7 @@ import {
 import { getOpportunity, approveOpportunity, dismissOpportunity } from "../actions"
 import { OpportunityDetailClient } from "./opportunity-detail-client"
 import { CheckIcon, XIcon, MapPinIcon, GitBranchIcon } from "lucide-react"
-import type { OpportunityStatus } from "@prisma/client"
+import type { OpportunityStatus } from "@/types"
 import { cn } from "@/lib/utils"
 
 const typeBadgeClass: Record<string, string> = {
@@ -56,7 +56,7 @@ export default async function OpportunityDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  let opportunity: Awaited<ReturnType<typeof getOpportunity>> = null
+  let opportunity: any = null
 
   try {
     opportunity = await getOpportunity(id)
@@ -66,7 +66,7 @@ export default async function OpportunityDetailPage({
 
   if (!opportunity) notFound()
 
-  const confidence = opportunity.confidenceScore != null
+  const confidence = opportunity?.confidenceScore != null
     ? Math.round(opportunity.confidenceScore * 100)
     : 0
 

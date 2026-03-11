@@ -209,7 +209,7 @@ export function GenerateProposalDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+                <DialogTrigger>
         <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700">
           <PlusIcon className="mr-1 h-4 w-4" />
           Generate Proposal

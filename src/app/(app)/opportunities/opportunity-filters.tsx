@@ -69,7 +69,7 @@ export function OpportunityFilters() {
           className="pl-8"
         />
       </div>
-      <Select value={type} onValueChange={(v) => setParam("type", v)}>
+      <Select value={type} onValueChange={(v) => setParam("type", v || "")}>
         <SelectTrigger className="w-[140px]">
           <SelectValue placeholder="Type" />
         </SelectTrigger>
@@ -81,7 +81,7 @@ export function OpportunityFilters() {
           <SelectItem value="NO_CHANGE">No change</SelectItem>
         </SelectContent>
       </Select>
-      <Select value={status} onValueChange={(v) => setParam("status", v)}>
+      <Select value={status} onValueChange={(v) => setParam("status", v || "")}>
         <SelectTrigger className="w-[140px]">
           <SelectValue placeholder="Status" />
         </SelectTrigger>
@@ -93,7 +93,7 @@ export function OpportunityFilters() {
           <SelectItem value="DISMISSED">Dismissed</SelectItem>
         </SelectContent>
       </Select>
-      <Select value={quadrant} onValueChange={(v) => setParam("quadrant", v)}>
+      <Select value={quadrant} onValueChange={(v) => setParam("quadrant", v || "")}>
         <SelectTrigger className="w-[160px]">
           <SelectValue placeholder="Quadrant" />
         </SelectTrigger>

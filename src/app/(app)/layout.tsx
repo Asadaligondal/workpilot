@@ -1,6 +1,7 @@
 import { AppSidebar } from "@/components/app-sidebar"
 import { TopBar } from "@/components/top-bar"
 import { CommandPalette } from "@/components/command-palette"
+import { CreateFirstWorkspace } from "@/components/create-first-workspace"
 import {
   SidebarInset,
   SidebarProvider,
@@ -23,14 +24,22 @@ async function getLayoutData() {
 
     const workspaces = await getWorkspacesForUser()
     const activeWorkspace = await getActiveWorkspace()
-    const notifications = await getNotifications()
-    const unreadCount = notifications.filter((n) => !n.isRead).length
-    const recentNotifications = notifications.slice(0, 5)
+
+    let notifications: any[] = []
+    if (activeWorkspace) {
+      try {
+        notifications = await getNotifications()
+      } catch {
+        notifications = []
+      }
+    }
+    const unreadCount = notifications.filter((n: any) => !n.isRead).length
+    const recentNotifications = notifications.slice(0, 5) as any
 
     return {
-      workspaces: workspaces.map((w) => ({
+      workspaces: workspaces.filter((w): w is NonNullable<typeof w> => w !== null).map((w: any) => ({
         id: w.id,
-        name: w.name,
+        name: w.name || "",
         plan: w.subscription?.plan ?? "free",
       })),
       activeWorkspaceId: activeWorkspace?.id ?? null,
@@ -58,6 +67,10 @@ export default async function AppLayout({
     unreadCount,
     recentNotifications,
   } = await getLayoutData()
+
+  if (workspaces.length === 0) {
+    return <CreateFirstWorkspace />
+  }
 
   return (
     <SidebarProvider>
